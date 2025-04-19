@@ -1,18 +1,19 @@
 import boto3
 import requests
 import os
-import json
-
-TEMP_FILE_PATH = "/tmp/notification_state.json"
+from boto3.dynamodb.conditions import Key
 
 def lambda_handler(event, context):
     # Configuration
     WEATHER_API_KEY = os.environ['WEATHER_API_KEY']
     SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
+    DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
     ZIP_CODE = "95117"
     TEMPERATURE_THRESHOLD = 65
 
-    # Initialize SNS client
+    # Initialize clients
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(DYNAMODB_TABLE)
     sns = boto3.client('sns')
 
     # Fetch current temperature
@@ -21,14 +22,9 @@ def lambda_handler(event, context):
     weather_data = response.json()
     current_temp = weather_data['main']['temp']
 
-    # Load notification state from temporary storage
-    try:
-        with open(TEMP_FILE_PATH, 'r') as file:
-            state = json.load(file)
-    except FileNotFoundError:
-        state = {"notified_below": False}
-
-    last_notified_below = state.get("notified_below", False)
+    # Check last notification state in DynamoDB
+    state = table.get_item(Key={'zip_code': ZIP_CODE})
+    last_notified_below = state.get('Item', {}).get('notified_below', False)
 
     if current_temp < TEMPERATURE_THRESHOLD:
         if not last_notified_below:
@@ -38,16 +34,12 @@ def lambda_handler(event, context):
                 Message=f"Temperature alert! The current temperature in {ZIP_CODE} is {current_temp}°F, which is below {TEMPERATURE_THRESHOLD}°F.",
                 Subject="Temperature Alert"
             )
-            # Update state in temporary storage
-            state["notified_below"] = True
-            with open(TEMP_FILE_PATH, 'w') as file:
-                json.dump(state, file)
+            # Update state in DynamoDB
+            table.put_item(Item={'zip_code': ZIP_CODE, 'notified_below': True})
     else:
         if last_notified_below:
-            # Update state in temporary storage to allow future notifications
-            state["notified_below"] = False
-            with open(TEMP_FILE_PATH, 'w') as file:
-                json.dump(state, file)
+            # Update state in DynamoDB to allow future notifications
+            table.put_item(Item={'zip_code': ZIP_CODE, 'notified_below': False})
 
     return {
         'statusCode': 200,
