@@ -52,7 +52,7 @@ def lambda_handler(event, context):
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"The current temperature in ZIP code *{ZIP_CODE}* is *{current_temp}°F*" + 
+                        "text": f"<@carchi8py> The current temperature in ZIP code *{ZIP_CODE}* is *{current_temp}°F*" + 
                                (f", which is below the threshold of {TEMPERATURE_THRESHOLD}°F." if current_temp < TEMPERATURE_THRESHOLD else ".")
                     }
                 },
@@ -74,7 +74,7 @@ def lambda_handler(event, context):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*This is a test notification.* Normal temperature threshold rules have been bypassed."
+                    "text": "*This is a test notification.* <@carchi8py> Normal temperature threshold rules have been bypassed."
                 }
             })
         
@@ -94,7 +94,7 @@ def lambda_handler(event, context):
         sns.publish(
             TopicArn=SNS_TOPIC_ARN,
             Message=json.dumps({
-                "default": f"{message_prefix}Temperature alert! The current temperature in {ZIP_CODE} is {current_temp}°F" +
+                "default": f"{message_prefix}Temperature alert! @carchi8py The current temperature in {ZIP_CODE} is {current_temp}°F" +
                          (f", which is below {TEMPERATURE_THRESHOLD}°F." if current_temp < TEMPERATURE_THRESHOLD else ".")
             }),
             MessageStructure='json'
