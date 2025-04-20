@@ -2,10 +2,10 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Zip the Lambda function
+# Zip the Lambda function with dependencies
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file = "${path.module}/../src/lambda_temperature_notification/lambda_temperature_notification.py"
+  source_dir  = "${path.module}/../src/lambda_temperature_notification/package"
   output_path = "${path.module}/lambda_temperature_notification.zip"
 }
 
