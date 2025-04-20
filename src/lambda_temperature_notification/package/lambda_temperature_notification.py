@@ -1,5 +1,6 @@
 import boto3
 import requests
+import json
 import os
 from boto3.dynamodb.conditions import Key
 
@@ -8,6 +9,7 @@ def lambda_handler(event, context):
     WEATHER_API_KEY = os.environ['WEATHER_API_KEY']
     SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
     DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
+    SLACK_WEBHOOK_URL = os.environ['SLACK_WEBHOOK_URL']
     ZIP_CODE = "95117"
     TEMPERATURE_THRESHOLD = 65
 
@@ -28,12 +30,56 @@ def lambda_handler(event, context):
 
     if current_temp < TEMPERATURE_THRESHOLD:
         if not last_notified_below:
-            # Send notification
+            # Prepare Slack message
+            slack_message = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🌡️ Temperature Alert!",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"The current temperature in ZIP code *{ZIP_CODE}* is *{current_temp}°F*, which is below the threshold of {TEMPERATURE_THRESHOLD}°F."
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"_Notification sent by AWS Lambda at {weather_data.get('dt', 'N/A')}_"
+                            }
+                        ]
+                    }
+                ]
+            }
+            
+            # Send to Slack directly
+            try:
+                slack_response = requests.post(
+                    SLACK_WEBHOOK_URL,
+                    data=json.dumps(slack_message),
+                    headers={'Content-Type': 'application/json'}
+                )
+                slack_response.raise_for_status()
+            except Exception as e:
+                print(f"Failed to send Slack notification: {str(e)}")
+            
+            # Also publish to SNS for redundancy
             sns.publish(
                 TopicArn=SNS_TOPIC_ARN,
-                Message=f"Temperature alert! The current temperature in {ZIP_CODE} is {current_temp}°F, which is below {TEMPERATURE_THRESHOLD}°F.",
-                Subject="Temperature Alert"
+                Message=json.dumps({
+                    "default": f"Temperature alert! The current temperature in {ZIP_CODE} is {current_temp}°F, which is below {TEMPERATURE_THRESHOLD}°F.",
+                }),
+                MessageStructure='json'
             )
+            
             # Update state in DynamoDB
             table.put_item(Item={'zip_code': ZIP_CODE, 'notified_below': True})
     else:

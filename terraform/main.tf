@@ -75,9 +75,10 @@ resource "aws_lambda_function" "temperature_notification" {
 
   environment {
     variables = {
-      WEATHER_API_KEY = var.weather_api_key
-      SNS_TOPIC_ARN   = aws_sns_topic.temperature_notification.arn
-      DYNAMODB_TABLE  = aws_dynamodb_table.temperature_notification_table.name
+      WEATHER_API_KEY   = var.weather_api_key
+      SNS_TOPIC_ARN     = aws_sns_topic.temperature_notification.arn
+      DYNAMODB_TABLE    = aws_dynamodb_table.temperature_notification_table.name
+      SLACK_WEBHOOK_URL = var.slack_webhook_url
     }
   }
 
@@ -96,13 +97,6 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
 # Create SNS Topic for notifications
 resource "aws_sns_topic" "temperature_notification" {
   name = "temperature-notifications"
-}
-
-# Create SNS subscription for email
-resource "aws_sns_topic_subscription" "temperature_email_subscription" {
-  topic_arn = aws_sns_topic.temperature_notification.arn
-  protocol  = "email"
-  endpoint  = var.notification_email
 }
 
 # Create DynamoDB table for storing temperature notification state
