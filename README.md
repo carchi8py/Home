@@ -1,6 +1,10 @@
 # Lambda Temperature Notification
 
-This project contains an AWS Lambda function that sends a text notification when the temperature at ZIP code 95117 goes below 65°F. The function ensures no duplicate notifications are sent unless the temperature rises above 65°F. It runs every 10 minutes using EventBridge.
+This project contains an AWS Lambda function that sends a text notification when the temperature at ZIP code 95117 goes below 65°F. The function ensures no duplicate notifications are sent unless the temperature rises above 65°F. It runs hourly using CloudWatch Events.
+
+## Project Structure
+- `/src/lambda_temperature_notification/` - Contains the Lambda function source code
+- `/terraform/` - Contains Terraform infrastructure as code to deploy resources to AWS
 
 ## Environment Variables
 To configure the Lambda function, set the following environment variables:
@@ -9,9 +13,59 @@ To configure the Lambda function, set the following environment variables:
    - Sign up at [OpenWeatherMap](https://openweathermap.org/) to get an API key.
 
 2. **`SNS_TOPIC_ARN`**: The ARN of the SNS topic used to send notifications.
-   - Create an SNS topic in AWS and subscribe your phone number to it.
 
-## Steps to Set Up the Lambda Function
+3. **`DYNAMODB_TABLE`**: The name of the DynamoDB table used to store notification state.
+
+## Terraform Deployment
+
+This project uses Terraform to automate the deployment of all required AWS resources. The Terraform configuration creates:
+
+1. **Lambda Function**: Deploys the temperature notification function with all required dependencies
+2. **IAM Role**: Sets up appropriate permissions for the Lambda function
+3. **DynamoDB Table**: Creates a table to store notification state
+4. **SNS Topic**: Sets up notifications for temperature alerts
+5. **CloudWatch Event Rule**: Configures the Lambda to run on an hourly schedule
+6. **CloudWatch Log Group**: Sets up logging for the Lambda function
+
+### Steps to Deploy with Terraform
+
+1. **Configure Variables**
+   - Update `/terraform/terraform.tfvars` with your specific values:
+     ```
+     aws_region        = "us-east-2"  # Region for deployment
+     weather_api_key   = "your-api-key"  # OpenWeatherMap API key 
+     notification_email = "your-email@example.com"  # Email for notifications
+     ```
+
+2. **Initialize Terraform**
+   ```
+   cd terraform
+   terraform init
+   ```
+
+3. **Preview Changes**
+   ```
+   terraform plan
+   ```
+
+4. **Apply Configuration**
+   ```
+   terraform apply
+   ```
+
+5. **Confirm SNS Subscription**
+   - Check your email and confirm the SNS subscription to receive notifications
+
+### Cleanup Resources
+To remove all AWS resources created by this project:
+```
+cd terraform
+terraform destroy
+```
+
+## Manual Setup (Alternative to Terraform)
+
+If you prefer to set up resources manually instead of using Terraform, follow these steps:
 
 ### 1. Create the Lambda Function
 1. Go to the [AWS Lambda Console](https://console.aws.amazon.com/lambda/).
@@ -21,12 +75,12 @@ To configure the Lambda function, set the following environment variables:
 5. Configure the environment variables as described above.
 6. Set the execution role to include permissions for:
    - **SNS Publish** (to send notifications).
-   - **S3 Read/Write** (if using S3 for state storage).
+   - **DynamoDB Read/Write** (to store notification state).
 
 ### 2. Set Up EventBridge Rule
 1. Go to the [AWS EventBridge Console](https://console.aws.amazon.com/events/).
 2. Create a new rule.
-3. Set the rule to trigger every 10 minutes.
+3. Set the rule to trigger every hour.
 4. Add the Lambda function as the target.
 
 ### 3. Set Up SNS Topic
@@ -35,21 +89,10 @@ To configure the Lambda function, set the following environment variables:
 3. Subscribe your phone number to the topic.
 4. Note the topic's ARN and set it as the `SNS_TOPIC_ARN` environment variable in the Lambda function.
 
-## Optional: Using S3 for State Storage
-If you prefer to use S3 for storing the notification state:
-1. Create an S3 bucket.
-2. Update the Lambda function code to use S3 for state storage.
-3. Grant the Lambda execution role permissions to read/write to the S3 bucket.
-
-## Testing the Function
-1. Manually invoke the Lambda function from the AWS Lambda Console.
-2. Verify that the notification is sent when the temperature is below 65°F.
-3. Check that no duplicate notifications are sent unless the temperature rises above 65°F.
-
 ## Costs
-- **Lambda**: Pay per execution (free tier available).
-- **SNS**: Pay per notification sent.
-- **EventBridge**: Free for the first 1 million events per month.
-- **S3 (if used)**: Minimal cost for storage and requests.
+- **Lambda**: Pay per execution (free tier available)
+- **DynamoDB**: Free tier includes 25GB storage and sufficient throughput for this application
+- **SNS**: Pay per notification sent
+- **CloudWatch Events**: Free for the first million events per month
 
 For more details, refer to the [AWS Pricing Calculator](https://calculator.aws/).
