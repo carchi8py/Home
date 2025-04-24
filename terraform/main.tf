@@ -135,3 +135,97 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.hourly.arn
 }
+
+# Zip the Loto Price Checker Lambda function with dependencies
+data "archive_file" "loto_lambda_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../src/lambda_loto_price_checker/package"
+  output_path = "${path.module}/lambda_loto_price_checker.zip"
+}
+
+# Create IAM role for Loto Price Checker Lambda
+resource "aws_iam_role" "loto_lambda_role" {
+  name = "loto_price_checker_lambda_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Attach policies to Loto Price Checker Lambda IAM role
+resource "aws_iam_role_policy" "loto_lambda_policy" {
+  name   = "loto_price_checker_lambda_policy"
+  role   = aws_iam_role.loto_lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+# Create Loto Price Checker Lambda function
+resource "aws_lambda_function" "loto_price_checker" {
+  function_name    = "loto_price_checker"
+  filename         = data.archive_file.loto_lambda_zip.output_path
+  source_code_hash = data.archive_file.loto_lambda_zip.output_base64sha256
+  role             = aws_iam_role.loto_lambda_role.arn
+  handler          = "lambda_loto_price_checker.lambda_handler"
+  runtime          = "python3.9"
+  timeout          = 30  # Increased timeout for web scraping operations
+
+  environment {
+    variables = {
+      SLACK_WEBHOOK_URL = var.slack_webhook_url
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy.loto_lambda_policy,
+    aws_cloudwatch_log_group.loto_lambda_logs,
+  ]
+}
+
+# Create CloudWatch Log Group for Loto Price Checker
+resource "aws_cloudwatch_log_group" "loto_lambda_logs" {
+  name              = "/aws/lambda/loto_price_checker"
+  retention_in_days = 14
+}
+
+# Setup CloudWatch Event Rule to trigger Loto Price Checker Lambda daily
+resource "aws_cloudwatch_event_rule" "daily_loto_check" {
+  name                = "daily-loto-price-check"
+  description         = "Trigger loto price checker lambda daily"
+  schedule_expression = "cron(0 16 ? * * *)"  # Runs at 4:00 PM UTC every day
+}
+
+resource "aws_cloudwatch_event_target" "trigger_loto_lambda" {
+  rule      = aws_cloudwatch_event_rule.daily_loto_check.name
+  target_id = "loto_price_checker"
+  arn       = aws_lambda_function.loto_price_checker.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch_loto" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.loto_price_checker.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.daily_loto_check.arn
+}
