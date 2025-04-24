@@ -180,6 +180,11 @@ cython_debug/
 *.tfplan
 .terraform/
 .terraform.lock.hcl
+variables.tf
+
+# Terraform deployment packages
+*.zip
+terraform/*.zip
 
 # Local .terraform directories
 **/.terraform/*
