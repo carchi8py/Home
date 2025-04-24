@@ -115,11 +115,11 @@ resource "aws_dynamodb_table" "temperature_notification_table" {
   }
 }
 
-# Setup CloudWatch Event Rule to trigger Lambda on a schedule (every hour)
+# Setup CloudWatch Event Rule to trigger Lambda every 15 minutes
 resource "aws_cloudwatch_event_rule" "hourly" {
-  name                = "hourly-temperature-check"
-  description         = "Trigger temperature check lambda hourly"
-  schedule_expression = "cron(0 * * * ? *)"
+  name                = "every-15-minutes-temperature-check"
+  description         = "Trigger temperature check lambda every 15 minutes"
+  schedule_expression = "cron(0/15 * * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "trigger_lambda" {

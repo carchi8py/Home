@@ -19,5 +19,4 @@ variable "slack_webhook_url" {
   description = "Webhook URL for Slack notifications"
   type        = string
   sensitive   = true
-  default     = "https://hooks.slack.com/services/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"
 }
